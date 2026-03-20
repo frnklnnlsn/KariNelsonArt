@@ -1,1 +1,12 @@
 public/
+venv/
+public/
+rclone.exe
+sync.bat
+sync.txt
+*.deb
+.DS_Store
+*.bak
+gallery.db
+imagenames.txt
+.hugo_build.lock
