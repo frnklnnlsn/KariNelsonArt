@@ -14,6 +14,7 @@ import time
 import sqlite3
 import smtplib
 import ssl
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -204,46 +205,57 @@ def save_image(file, ext):
     return filename
 
 
-def send_contact_email(sender_name, sender_email, message_body):
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-        raise RuntimeError(
-            "Gmail credentials not set. Export GMAIL_USER and GMAIL_APP_PASSWORD."
-        )
+def contact_recipient():
+    """Where contact form messages go: the editor's setting, else the server default."""
+    return get_setting("contact_recipient") or CONTACT_RECIPIENT
+
+
+def send_contact_email(sender_name, sender_email, phone, message_body):
+    recipient = contact_recipient()
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD or not recipient:
+        raise RuntimeError("Email isn't configured. Set GMAIL_USER and GMAIL_APP_PASSWORD.")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"]  = f"New message from {sender_name} — Kari Nelson Art"
     msg["From"]     = GMAIL_USER
-    msg["To"]       = CONTACT_RECIPIENT
+    msg["To"]       = recipient
     msg["Reply-To"] = sender_email
 
+    phone_line = f"Phone:   {phone}\n" if phone else ""
     plain = (
         f"Name:    {sender_name}\n"
-        f"Email:   {sender_email}\n\n"
+        f"Email:   {sender_email}\n"
+        f"{phone_line}\n"
         f"Message:\n{message_body}"
     )
+    safe_name, safe_email, safe_phone = escape(sender_name), escape(sender_email), escape(phone)
+    safe_body = escape(message_body).replace(chr(10), "<br>")
+    phone_html = f"<p><strong>Phone:</strong> {safe_phone}</p>" if phone else ""
     html = f"""
     <html><body>
       <h2>New contact form submission</h2>
-      <p><strong>Name:</strong> {sender_name}</p>
-      <p><strong>Email:</strong> <a href="mailto:{sender_email}">{sender_email}</a></p>
+      <p><strong>Name:</strong> {safe_name}</p>
+      <p><strong>Email:</strong> <a href="mailto:{safe_email}">{safe_email}</a></p>
+      {phone_html}
       <hr>
-      <p>{message_body.replace(chr(10), '<br>')}</p>
+      <p>{safe_body}</p>
     </body></html>
     """
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
 
     context = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as server:
         server.ehlo()
         server.starttls(context=context)
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
-        server.sendmail(GMAIL_USER, CONTACT_RECIPIENT, msg.as_string())
+        server.sendmail(GMAIL_USER, recipient, msg.as_string())
 
 
 ARTWORK_FIELDS = ("title", "date", "description", "category", "artist_statement")
 TEXT_KEY = re.compile(r"^[a-z0-9_]{1,80}$")
 SAFE_URL = re.compile(r"^(https?://|mailto:|/|#)", re.I)
+EMAIL_ADDRESS = re.compile(r"^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$")
 
 
 def clean_artwork(data):
@@ -416,6 +428,24 @@ def api_delete_artwork():
     return jsonify(ok=True)
 
 
+@app.route("/_admin/api/contact-recipient", methods=["POST"])
+def api_contact_recipient():
+    address = request.form.get("email", "").strip()
+    if not EMAIL_ADDRESS.match(address) or len(address) > 254:
+        return error("Please enter one complete email address.")
+    set_setting("contact_recipient", address)
+    if request.form.get("test") != "1":
+        return jsonify(ok=True)
+    try:
+        send_contact_email("Website test", GMAIL_USER or address, "", "This is a test from your website's contact form. It's working!")
+    except RuntimeError:
+        return error("Saved, but the server's email account isn't set up yet, so messages can't be sent.", 500)
+    except (smtplib.SMTPException, OSError) as e:
+        print("Contact test email error:", e)
+        return error("Saved, but the test email couldn't be sent. The server's email login may need fixing.", 500)
+    return jsonify(ok=True)
+
+
 # ---------------------------------------------------------------------------
 # The editor: the real built site, plus the editing tools
 # ---------------------------------------------------------------------------
@@ -424,7 +454,9 @@ def asset_version(name):
 
 
 def editor_tags():
-    config = json.dumps({"csrf": session["csrf"], "saved": read_site_text()}).replace("<", "\\u003c")
+    config = json.dumps({
+        "csrf": session["csrf"], "saved": read_site_text(), "recipient": contact_recipient(),
+    }).replace("<", "\\u003c")
     return (
         f'<link rel="stylesheet" href="/_admin/assets/editor.css?v={asset_version("editor.css")}">'
         f"<script>window.KN_ADMIN = {config};</script>"
@@ -465,15 +497,19 @@ def too_large(_):
 # ---------------------------------------------------------------------------
 @app.route("/contact-submit", methods=["POST"])
 def contact_submit():
-    name    = request.form.get("name", "").strip()
-    email   = request.form.get("email", "").strip()
-    message = request.form.get("message", "").strip()
+    if request.form.get("website"):  # hidden field only spam bots fill in
+        return redirect("/thank-you/")
 
-    if not name or not email or not message:
+    name    = " ".join(request.form.get("name", "").split())[:200]
+    email   = request.form.get("email", "").strip()
+    phone   = " ".join(request.form.get("phone", "").split())[:40]
+    message = request.form.get("message", "").strip()[:10000]
+
+    if not name or not message or not EMAIL_ADDRESS.match(email) or len(email) > 254:
         return redirect("/contact/?error=missing-fields")
 
     try:
-        send_contact_email(name, email, message)
+        send_contact_email(name, email, phone, message)
         return redirect("/thank-you/")
     except Exception as e:
         print("Contact email error:", e)

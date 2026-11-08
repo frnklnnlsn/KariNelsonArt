@@ -1,6 +1,7 @@
 (() => {
   "use strict";
   const { csrf, saved } = window.KN_ADMIN;
+  let recipient = window.KN_ADMIN.recipient || "";
   const onGallery = typeof artworks !== "undefined";
   const ART_PARTS = { "main-image": "image", "image-title": "title", "image-date": "date", "image-description": "description", "image-artist-statement": "artist_statement" };
   const ART_FIELDS = [
@@ -117,6 +118,33 @@
       make("p", { textContent: "Text, buttons and artwork with an outline can all be edited. You'll see your changes on the page as you make them." }),
       make("p", { textContent: "Visitors won't see anything until you press Publish." }),
     );
+    if (location.pathname === "/contact/") panel.append(make("hr", { className: "kn-divider" }), ...messageSettings());
+  }
+  function messageSettings() {
+    const input = make("input", { type: "email", value: recipient, placeholder: "name@example.com" });
+    const save = make("button", { className: "kn-btn kn-primary", type: "button", textContent: "Save" });
+    const test = make("button", { className: "kn-btn", type: "button", textContent: "Save and send a test" });
+    async function submit(button, sendTest) {
+      const body = new FormData();
+      body.append("email", input.value);
+      if (sendTest) body.append("test", "1");
+      save.disabled = test.disabled = true;
+      toast(sendTest ? "Sending a test email…" : "Saving…");
+      try {
+        await post("/_admin/api/contact-recipient", body);
+        recipient = input.value.trim();
+        toast(sendTest ? `Test sent to ${recipient}. Check that inbox.` : "Saved. New messages will go there.");
+      } catch (e) { toast(e.message, true); }
+      save.disabled = test.disabled = false;
+    }
+    save.addEventListener("click", () => submit(save, false));
+    test.addEventListener("click", () => submit(test, true));
+    return [
+      make("h2", { textContent: "Where messages go" }),
+      make("p", { textContent: "Messages from this form are sent to this email address. It isn't shown on your website." }),
+      field("Send messages to", input),
+      make("div", { className: "kn-actions" }, save, test),
+    ];
   }
   function editElement(el) {
     select(el);

@@ -1,65 +1,60 @@
-{{ define "head-styles" }}
 <style>
-    .page-content {
-        max-width: 800px; margin: 40px auto; padding: 20px;
-        background-color: #fff; border: 1px solid #e0e0e0; border-radius: 6px;
-    }
-    .contact-form { margin-top: 30px; }
+    .contact-page { max-width: 640px; margin: 48px auto 64px; padding: 0 20px; color: #333; }
+    .contact-page h1 { margin: 0 0 16px; font-size: 36px; text-align: center; }
+    .contact-intro { margin-bottom: 32px; color: #555; font-size: 17px; line-height: 1.55; text-align: center; }
+    .contact-intro p { margin: 0 0 12px; }
     .form-group { margin-bottom: 20px; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+    .form-group label { display: block; margin-bottom: 7px; font-weight: 600; color: #444; }
     .form-group input, .form-group textarea {
         width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 4px;
-        box-sizing: border-box; font-size: 16px;
+        box-sizing: border-box; font: inherit; font-size: 16px; background: #fff;
     }
-    .form-group textarea { resize: vertical; min-height: 150px; }
-    .form-group button {
-        background-color: #333; color: white; padding: 12px 25px; border: none;
-        border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold;
+    .form-group textarea { resize: vertical; min-height: 170px; }
+    .form-group input:focus, .form-group textarea:focus { outline: 2px solid #333; outline-offset: 0; border-color: transparent; }
+    .form-submit { text-align: center; }
+    .form-submit button {
+        background-color: #333; color: #fff; padding: 13px 34px; border: 0; border-radius: 4px;
+        cursor: pointer; font-size: 16px; font-weight: bold;
     }
-    .form-group button:hover { background-color: #555; }
-    .other-contact { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; }
-    .other-contact p { margin-bottom: 10px; }
+    .form-submit button:hover { background-color: #555; }
+    .form-trap { position: absolute; left: -9999px; }
     .form-error {
         background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;
         padding: 12px 16px; margin-bottom: 20px; color: #856404; font-size: 15px;
     }
 </style>
-{{ end }}
 
-<div class="page-content">
+<div class="contact-page">
     {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
     <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
-    <div data-edit="page_{{ replace .File.BaseFileName "-" "_" }}_body" data-edit-type="body" data-edit-label="Page text">{{ partial "fn/page-body.html" . }}</div>
+    <div class="contact-intro" data-edit="page_{{ replace .File.BaseFileName "-" "_" }}_body" data-edit-type="body" data-edit-label="Page text">{{ partial "fn/page-body.html" . }}</div>
 
-    {{/* Show error message if Flask redirected back with ?error= */}}
     <div id="form-error" class="form-error" style="display:none;"></div>
 
-    {{/* Action points to the Flask /contact-submit endpoint.
-         Caddy must proxy this path to localhost:5000 — see Caddy config. */}}
     <form class="contact-form" method="POST" action="/contact-submit">
-        <div class="form-group">
-            <label for="name" data-edit="form_label_name" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_name" "d" "Your Name") }}</label>
-            <input type="text" id="name" name="name" required>
+        <div class="form-trap" aria-hidden="true">
+            <input type="text" name="website" tabindex="-1" autocomplete="off">
         </div>
         <div class="form-group">
-            <label for="email" data-edit="form_label_email" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_email" "d" "Your Email") }}</label>
-            <input type="email" id="email" name="email" required>
+            <label for="name" data-edit="form_label_name" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_name" "d" "Name") }}</label>
+            <input type="text" id="name" name="name" autocomplete="name" maxlength="200" required>
+        </div>
+        <div class="form-group">
+            <label for="email" data-edit="form_label_email" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_email" "d" "Email") }}</label>
+            <input type="email" id="email" name="email" autocomplete="email" maxlength="254" required>
+        </div>
+        <div class="form-group">
+            <label for="phone" data-edit="form_label_phone" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_phone" "d" "Phone Number") }}</label>
+            <input type="tel" id="phone" name="phone" autocomplete="tel" maxlength="40">
         </div>
         <div class="form-group">
             <label for="message" data-edit="form_label_message" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_message" "d" "Message") }}</label>
-            <textarea id="message" name="message" required></textarea>
+            <textarea id="message" name="message" maxlength="10000" required></textarea>
         </div>
-        <div class="form-group">
+        <div class="form-submit">
             <button type="submit" data-edit="form_button" data-edit-type="text" data-edit-label="Button text">{{ partial "fn/text.html" (dict "k" "form_button" "d" "Send Message") }}</button>
         </div>
     </form>
-
-    <div class="other-contact">
-        <h3 data-edit="other_heading" data-edit-type="text" data-edit-label="Heading">{{ partial "fn/text.html" (dict "k" "other_heading" "d" "Other Ways to Reach Me") }}</h3>
-        {{ $email := partial "fn/text.html" (dict "k" "contact_email" "d" "karinelson@gmail.com") }}
-        <p>Email: <a href="mailto:{{ $email }}" data-edit="contact_email" data-edit-type="text" data-edit-label="Email address">{{ $email }}</a></p>
-        <p data-edit="other_social" data-edit-type="text" data-edit-label="Text">{{ partial "fn/text.html" (dict "k" "other_social" "d" "You can also find me on Facebook and Instagram.") }}</p>
-    </div>
 </div>
 
 <script>
