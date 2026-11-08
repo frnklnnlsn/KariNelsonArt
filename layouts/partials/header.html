@@ -5,9 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
     <title>{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }} | Kari Nelson Art</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaisei+HarunoUmi:wght@400;500;700&display=swap">
     <style>
+        button, input, textarea, select { font-family: inherit; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            font-family: "Kaisei HarunoUmi", Georgia, "Times New Roman", serif;
             margin: 0;
             background-color: #fcfcfc;
         }
