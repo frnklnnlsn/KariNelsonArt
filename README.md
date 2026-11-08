@@ -62,12 +62,19 @@ export FLASK_SECRET="your-secret-key"
 python init_db.py
 ```
 
-4. Run the admin app:
+4. Set the editor password:
+```bash
+python set_admin_password.py
+```
+
+5. Run the editor:
 ```bash
 python app.py
 ```
 
-The admin panel runs on `http://localhost:5000` and is intended to be kept private (not public-facing).
+Open port 5000 and sign in. The editor shows the real built site: click any outlined text, button, link or artwork to change it, then press Publish to rebuild the public site. Only `/contact-submit` is reachable without signing in.
+
+Text edits are saved to `data/site.json` and artwork to `gallery.db`. Both are ignored by git, so back them up with `static/gallery/`.
 
 ---
 

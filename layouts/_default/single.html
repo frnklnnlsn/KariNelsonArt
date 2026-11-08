@@ -13,9 +13,10 @@
 {{/* This is for all other simple pages (like "Thank You") */}}
 {{ else }}
     <div class="page-content" style="max-width: 800px; margin: 40px auto; padding: 20px; text-align: center;">
-        <h1>{{ .Title }}</h1>
-        <p style="font-size: 1.2em;">{{ .Content }}</p>
-        <p><a href="/gallery/" style="text-decoration: none; font-weight: bold;">← Back to the Gallery</a></p>
+        {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
+        <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
+        <div style="font-size: 1.2em;" data-edit="page_{{ replace .File.BaseFileName "-" "_" }}_body" data-edit-type="body" data-edit-label="Page text">{{ partial "fn/page-body.html" . }}</div>
+        <p><a href="/gallery/" style="text-decoration: none; font-weight: bold;" data-edit="back_to_gallery" data-edit-type="text" data-edit-label="Link text">{{ partial "fn/text.html" (dict "k" "back_to_gallery" "d" "← Back to the Gallery") }}</a></p>
     </div>
 {{ end }}
 

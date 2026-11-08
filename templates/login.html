@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in | Kari Nelson Art</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fcfcfc; color: #333;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  form, .notice { width: min(340px, calc(100vw - 40px)); box-sizing: border-box; padding: 32px; background: #fff;
+         border: 1px solid #e0e0e0; border-radius: 6px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  p { color: #666; margin: 0 0 24px; line-height: 1.4; }
+  label { display: block; font-weight: bold; color: #555; margin-bottom: 8px; }
+  input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+  button { width: 100%; margin-top: 16px; padding: 12px; font-size: 16px; font-weight: bold; color: #fff;
+         background: #333; border: 0; border-radius: 4px; cursor: pointer; }
+  button:hover { background: #555; }
+  .error { margin-top: 14px; padding: 10px 12px; color: #856404; background: #fff3cd; border-radius: 4px; }
+  code { font-size: 14px; }
+</style>
+</head>
+<body>
+{% if ready %}
+<form method="POST">
+  <h1>Kari Nelson</h1>
+  <p>Sign in to edit your website.</p>
+  <label for="password">Password</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+  <button type="submit">Sign in</button>
+  {% if message %}<div class="error" role="alert">{{ message }}</div>{% endif %}
+</form>
+{% else %}
+<div class="notice">
+  <h1>Almost ready</h1>
+  <p>No password has been set yet. On the server, run <code>python3 set_admin_password.py</code>.</p>
+</div>
+{% endif %}
+</body>
+</html>

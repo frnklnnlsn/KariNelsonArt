@@ -27,8 +27,9 @@
 {{ end }}
 
 <div class="page-content">
-    <h1>{{ .Title }}</h1>
-    <p>{{ .Content }}</p>
+    {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
+    <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
+    <div data-edit="page_{{ replace .File.BaseFileName "-" "_" }}_body" data-edit-type="body" data-edit-label="Page text">{{ partial "fn/page-body.html" . }}</div>
 
     {{/* Show error message if Flask redirected back with ?error= */}}
     <div id="form-error" class="form-error" style="display:none;"></div>
@@ -37,26 +38,27 @@
          Caddy must proxy this path to localhost:5000 — see Caddy config. */}}
     <form class="contact-form" method="POST" action="/contact-submit">
         <div class="form-group">
-            <label for="name">Your Name</label>
+            <label for="name" data-edit="form_label_name" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_name" "d" "Your Name") }}</label>
             <input type="text" id="name" name="name" required>
         </div>
         <div class="form-group">
-            <label for="email">Your Email</label>
+            <label for="email" data-edit="form_label_email" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_email" "d" "Your Email") }}</label>
             <input type="email" id="email" name="email" required>
         </div>
         <div class="form-group">
-            <label for="message">Message</label>
+            <label for="message" data-edit="form_label_message" data-edit-type="text" data-edit-label="Form label">{{ partial "fn/text.html" (dict "k" "form_label_message" "d" "Message") }}</label>
             <textarea id="message" name="message" required></textarea>
         </div>
         <div class="form-group">
-            <button type="submit">Send Message</button>
+            <button type="submit" data-edit="form_button" data-edit-type="text" data-edit-label="Button text">{{ partial "fn/text.html" (dict "k" "form_button" "d" "Send Message") }}</button>
         </div>
     </form>
 
     <div class="other-contact">
-        <h3>Other Ways to Reach Me</h3>
-        <p>Email: <a href="mailto:karinelson@gmail.com">karinelson@gmail.com</a></p>
-        <p>You can also find me on Facebook and Instagram.</p>
+        <h3 data-edit="other_heading" data-edit-type="text" data-edit-label="Heading">{{ partial "fn/text.html" (dict "k" "other_heading" "d" "Other Ways to Reach Me") }}</h3>
+        {{ $email := partial "fn/text.html" (dict "k" "contact_email" "d" "karinelson@gmail.com") }}
+        <p>Email: <a href="mailto:{{ $email }}" data-edit="contact_email" data-edit-type="text" data-edit-label="Email address">{{ $email }}</a></p>
+        <p data-edit="other_social" data-edit-type="text" data-edit-label="Text">{{ partial "fn/text.html" (dict "k" "other_social" "d" "You can also find me on Facebook and Instagram.") }}</p>
     </div>
 </div>
 

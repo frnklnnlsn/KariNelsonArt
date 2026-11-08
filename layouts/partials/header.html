@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ .Title }} | Kari Nelson Art</title>
+    {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
+    <title>{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }} | Kari Nelson Art</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
@@ -46,18 +47,17 @@
 </head>
 <body>
     <header class="site-header">
-        <a href="/" class="site-title">Kari Nelson</a>
+        <a href="/" class="site-title" data-edit="site_title" data-edit-type="text" data-edit-label="Site name">{{ partial "fn/text.html" (dict "k" "site_title" "d" "Kari Nelson") }}</a>
         <nav class="main-nav">
-            <a href="/">About</a>
-            <a href="/gallery/">Gallery</a>
-            <a href="/contact/">Contact</a>
+            <a href="/" data-edit="nav_about" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_about" "d" "About") }}</a>
+            <a href="/gallery/" data-edit="nav_gallery" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_gallery" "d" "Gallery") }}</a>
+            <a href="/contact/" data-edit="nav_contact" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_contact" "d" "Contact") }}</a>
         </nav>
         <nav class="social-nav">
-            {{/* Remember to replace # with actual links */}}
-            <a href="#" target="_blank" rel="noopener noreferrer" title="Facebook">
+                        <a href="{{ partial "fn/text.html" (dict "k" "social_facebook_url" "d" "#") }}" target="_blank" rel="noopener noreferrer" title="Facebook" data-edit="social_facebook_url" data-edit-type="url" data-edit-label="Facebook link">
                 <img src="/social/facebook-icon.svg" alt="Facebook">
             </a>
-            <a href="#" target="_blank" rel="noopener noreferrer" title="Instagram">
+            <a href="{{ partial "fn/text.html" (dict "k" "social_instagram_url" "d" "#") }}" target="_blank" rel="noopener noreferrer" title="Instagram" data-edit="social_instagram_url" data-edit-type="url" data-edit-label="Instagram link">
                 <img src="/social/instagram-icon.svg" alt="Instagram">
             </a>
         </nav>

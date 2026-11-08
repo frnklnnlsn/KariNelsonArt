@@ -1,0 +1,5 @@
+{{- /* Returns the text saved from the editor (data/site.json), or the default .d */ -}}
+{{- $saved := site.Data.site | default dict -}}
+{{- $result := .d -}}
+{{- if isset $saved .k -}}{{- $result = index $saved .k -}}{{- end -}}
+{{- return $result -}}

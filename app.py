@@ -1,6 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import (
+    Flask, Response, abort, jsonify, redirect, render_template, request,
+    send_from_directory, session, url_for,
+)
+from werkzeug.security import check_password_hash
+from werkzeug.utils import safe_join
 import os
 import csv
+import json
+import re
+import secrets
+import threading
+import time
 import sqlite3
 import smtplib
 import ssl
@@ -17,7 +27,9 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 GALLERY_DIR = os.path.join(BASE_DIR, "static", "gallery")
 DB_FILE     = os.path.join(BASE_DIR, "gallery.db")
 
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif"}
+SITE_DATA   = os.path.join(BASE_DIR, "data", "site.json")
+HUGO_BIN    = os.environ.get("HUGO_BIN", "/usr/bin/hugo")
+OUTPUT_DIR  = os.environ.get("SITE_OUTPUT_DIR", "/var/www/html")
 
 # Gmail credentials — set as environment variables on the server, never hardcode.
 #   export GMAIL_USER="yourgmail@gmail.com"
@@ -27,8 +39,16 @@ GMAIL_USER        = os.environ.get("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 CONTACT_RECIPIENT  = os.environ.get("CONTACT_RECIPIENT", GMAIL_USER)
 
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", "change-me-in-production")
+app = Flask(__name__, static_folder="admin_static", static_url_path="/_admin/assets")
+app.config.update(
+    MAX_CONTENT_LENGTH=60 * 1024 * 1024,
+    PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 14,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("ADMIN_HTTPS_ONLY") == "1",
+)
+
+publish_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +71,41 @@ def get_db():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def get_setting(key):
+    with get_db() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS admin_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        row = conn.execute("SELECT value FROM admin_settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def set_setting(key, value):
+    get_setting(key)  # makes sure the table exists
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO admin_settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        conn.commit()
+
+
+def session_secret():
+    """FLASK_SECRET if set, otherwise a random key generated once and kept in the database."""
+    env_value = os.environ.get("FLASK_SECRET", "")
+    if env_value and env_value != "change-me-in-production":
+        return env_value
+    stored = get_setting("flask_secret")
+    if not stored:
+        stored = secrets.token_hex(32)
+        set_setting("flask_secret", stored)
+    return stored
+
+
+app.secret_key = session_secret()
 
 
 def load_artworks():
@@ -102,19 +157,51 @@ def delete_artwork(filename):
 # ---------------------------------------------------------------------------
 # Misc helpers
 # ---------------------------------------------------------------------------
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+def read_site_text():
+    if os.path.exists(SITE_DATA):
+        with open(SITE_DATA, encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def write_site_text(values):
+    os.makedirs(os.path.dirname(SITE_DATA), exist_ok=True)
+    tmp = SITE_DATA + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(values, f, ensure_ascii=False, indent=2, sort_keys=True)
+    os.replace(tmp, SITE_DATA)
 
 
 def rebuild_site():
+    """Rebuild the public site. Returns True if it worked."""
     try:
         subprocess.run(
-            ["/usr/bin/hugo", "-s", BASE_DIR, "-d", "/var/www/html", "--cleanDestinationDir"],
-            check=True,
+            [HUGO_BIN, "-s", BASE_DIR, "-d", OUTPUT_DIR, "--cleanDestinationDir"],
+            check=True, capture_output=True, text=True, timeout=180,
         )
-        print("Hugo site rebuilt successfully.")
-    except subprocess.CalledProcessError as e:
-        print("Error rebuilding Hugo site:", e)
+        return True
+    except (subprocess.SubprocessError, OSError) as e:
+        print("Error rebuilding Hugo site:", e, getattr(e, "stderr", ""))
+        return False
+
+
+IMAGE_SIGNATURES = ((b"\xff\xd8\xff", "jpg"), (b"\x89PNG\r\n\x1a\n", "png"), (b"GIF8", "gif"))
+
+
+def image_extension(file):
+    """Work out the real image type from the file's contents. None if it isn't one we accept."""
+    head = file.stream.read(16)
+    file.stream.seek(0)
+    for signature, ext in IMAGE_SIGNATURES:
+        if head.startswith(signature):
+            return ext
+    return None
+
+
+def save_image(file, ext):
+    filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
+    file.save(os.path.join(GALLERY_DIR, filename))
+    return filename
 
 
 def send_contact_email(sender_name, sender_email, message_body):
@@ -154,104 +241,223 @@ def send_contact_email(sender_name, sender_email, message_body):
         server.sendmail(GMAIL_USER, CONTACT_RECIPIENT, msg.as_string())
 
 
-def artwork_from_form(existing=None):
-    """Pull artwork fields out of a POST request."""
-    base = existing or {}
-    base["title"]            = request.form.get("title", "").strip()
-    base["date"]             = request.form.get("date", "").strip() or datetime.now().strftime("%Y")
-    base["description"]      = request.form.get("description", "").strip()
-    base["category"]         = request.form.get("category", "").strip()
-    base["artist_statement"] = request.form.get("artist_statement", "").strip()
-    return base
+ARTWORK_FIELDS = ("title", "date", "description", "category", "artist_statement")
+TEXT_KEY = re.compile(r"^[a-z0-9_]{1,80}$")
+SAFE_URL = re.compile(r"^(https?://|mailto:|/|#)", re.I)
+
+
+def clean_artwork(data):
+    """Keep only the known fields, as trimmed strings."""
+    art = {field: str(data.get(field) or "").strip() for field in ARTWORK_FIELDS}
+    if not art["date"]:
+        art["date"] = datetime.now().strftime("%Y")
+    return art
+
+
+def error(message, status=400):
+    return jsonify(ok=False, error=message), status
 
 
 # ---------------------------------------------------------------------------
-# Admin routes
+# Password protection: everything is locked unless listed here
 # ---------------------------------------------------------------------------
-@app.route("/", methods=["GET", "POST"])
-def upload():
+PUBLIC_ENDPOINTS = {"login", "contact_submit"}
+MAX_FAILURES = 8
+FAILURE_WINDOW = 300
+login_failures = {}
+
+
+@app.before_request
+def require_login():
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if not session.get("admin"):
+        if request.path.startswith("/_admin/api/"):
+            return error("You have been signed out. Please sign in again.", 401)
+        return redirect(url_for("login"))
     if request.method == "POST":
-        file = request.files.get("image")
-        if not file or not allowed_file(file.filename):
-            flash("Please upload a valid image file (jpg, jpeg, png, gif).")
-            return redirect(request.url)
+        sent = request.headers.get("X-CSRF-Token") or request.form.get("csrf", "")
+        if not secrets.compare_digest(sent, session.get("csrf", "")):
+            abort(403)
+    return None
 
-        title = request.form.get("title", "").strip()
-        if not title:
-            flash("Title is required.")
-            return redirect(request.url)
 
-        ext      = file.filename.rsplit(".", 1)[1].lower()
-        filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
-        file.save(os.path.join(GALLERY_DIR, filename))
+def recent_failures(ip):
+    now = time.time()
+    failures = [t for t in login_failures.get(ip, []) if now - t < FAILURE_WINDOW]
+    login_failures[ip] = failures
+    return failures
 
-        artwork = artwork_from_form()
-        artwork["filename"] = filename
-        insert_artwork(artwork)
 
+@app.route("/_admin/login", methods=["GET", "POST"])
+def login():
+    password_hash = get_setting("admin_password_hash")
+    message = None
+    if request.method == "POST" and password_hash:
+        ip = request.remote_addr
+        if len(recent_failures(ip)) >= MAX_FAILURES:
+            message = "Too many tries. Please wait a few minutes and try again."
+        elif check_password_hash(password_hash, request.form.get("password", "")):
+            login_failures.pop(ip, None)
+            session.clear()
+            session.permanent = True
+            session["admin"] = True
+            session["csrf"] = secrets.token_urlsafe(32)
+            return redirect("/")
+        else:
+            login_failures[ip].append(time.time())
+            message = "That password didn't match. Please try again."
+    return render_template("login.html", message=message, ready=bool(password_hash))
+
+
+@app.route("/_admin/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# ---------------------------------------------------------------------------
+# Editor actions
+# ---------------------------------------------------------------------------
+@app.route("/_admin/api/publish", methods=["POST"])
+def api_publish():
+    try:
+        changes = json.loads(request.form.get("changes", "{}"))
+        text = changes.get("text", {})
+        art_changes = changes.get("art", {})
+        assert isinstance(text, dict) and isinstance(art_changes, dict)
+    except (ValueError, AssertionError, AttributeError):
+        return error("Those changes couldn't be read. Please reload and try again.")
+
+    for key, value in text.items():
+        if not TEXT_KEY.match(key) or not isinstance(value, str) or len(value) > 20000:
+            return error("One of the text changes wasn't valid.")
+        if key.endswith("_url") and value.strip() and not SAFE_URL.match(value.strip()):
+            return error("Links need to start with https:// (for example https://facebook.com/yourpage).")
+
+    with publish_lock:
+        updates = []
+        for filename, data in art_changes.items():
+            existing = get_artwork(filename)
+            if not existing or not isinstance(data, dict):
+                return error("One of those artworks no longer exists. Please reload.")
+            art = clean_artwork(data)
+            if not art["title"]:
+                return error("Every artwork needs a title.")
+            upload = request.files.get(data.get("file") or "")
+            ext = None
+            if upload:
+                ext = image_extension(upload)
+                if not ext:
+                    return error(f"The new image for “{art['title']}” must be a JPG, PNG or GIF.")
+            updates.append((filename, art, upload, ext))
+
+        old_files = []
+        for filename, art, upload, ext in updates:
+            art["original_filename"] = filename
+            art["filename"] = filename
+            if upload:
+                art["filename"] = save_image(upload, ext)
+                old_files.append(filename)
+            update_artwork(art)
+
+        if text:
+            saved = read_site_text()
+            saved.update({key: value.strip() for key, value in text.items()})
+            write_site_text(saved)
+
+        if updates:
+            export_csv()
+        if not rebuild_site():
+            return error("Your changes were saved, but the website couldn't update..", 500)
+
+        for filename in old_files:
+            path = os.path.join(GALLERY_DIR, filename)
+            if os.path.exists(path):
+                os.remove(path)
+    return jsonify(ok=True)
+
+
+@app.route("/_admin/api/artwork", methods=["POST"])
+def api_add_artwork():
+    upload = request.files.get("image")
+    if not upload:
+        return error("Please choose an image first.")
+    ext = image_extension(upload)
+    if not ext:
+        return error("Please choose a JPG, PNG or GIF image.")
+    art = clean_artwork(request.form)
+    if not art["title"]:
+        return error("Please give the artwork a title.")
+
+    with publish_lock:
+        art["filename"] = save_image(upload, ext)
+        insert_artwork(art)
         export_csv()
-        rebuild_site()
-        flash("Artwork uploaded successfully!")
-        return redirect(request.url)
-
-    return render_template("upload.html")
+        if not rebuild_site():
+            return error("The artwork was saved, but the website couldn't update..", 500)
+    return jsonify(ok=True, filename=art["filename"])
 
 
-@app.route("/gallery")
-def gallery():
-    artworks = load_artworks()
-    return render_template("gallery.html", artworks=artworks)
+@app.route("/_admin/api/artwork/delete", methods=["POST"])
+def api_delete_artwork():
+    filename = request.form.get("filename", "")
+    if not get_artwork(filename):
+        return error("That artwork no longer exists. Please reload.", 404)
 
-
-@app.route("/edit/<filename>", methods=["GET", "POST"])
-def edit(filename):
-    artwork = get_artwork(filename)
-    if not artwork:
-        flash("Artwork not found.")
-        return redirect(url_for("gallery"))
-
-    if request.method == "POST":
-        original_filename = artwork["filename"]
-        artwork_from_form(existing=artwork)  # mutates artwork in-place
-
-        # Optional image replacement
-        file = request.files.get("image")
-        if file and allowed_file(file.filename):
-            old_path = os.path.join(GALLERY_DIR, original_filename)
-            if os.path.exists(old_path):
-                os.remove(old_path)
-            ext          = file.filename.rsplit(".", 1)[1].lower()
-            new_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.{ext}"
-            file.save(os.path.join(GALLERY_DIR, new_filename))
-            artwork["filename"] = new_filename
-
-        artwork["original_filename"] = original_filename
-        update_artwork(artwork)
-
+    with publish_lock:
+        delete_artwork(filename)
+        path = os.path.join(GALLERY_DIR, filename)
+        if os.path.exists(path):
+            os.remove(path)
         export_csv()
-        rebuild_site()
-        flash("Artwork updated!")
-        return redirect(url_for("gallery"))
-
-    return render_template("edit.html", artwork=artwork)
+        if not rebuild_site():
+            return error("The artwork was removed, but the website couldn't update..", 500)
+    return jsonify(ok=True)
 
 
-@app.route("/delete/<filename>", methods=["POST"])
-def delete(filename):
-    artwork = get_artwork(filename)
-    if not artwork:
-        flash("Artwork not found.")
-        return redirect(url_for("gallery"))
+# ---------------------------------------------------------------------------
+# The editor: the real built site, plus the editing tools
+# ---------------------------------------------------------------------------
+def asset_version(name):
+    return int(os.path.getmtime(os.path.join(app.static_folder, name)))
 
-    img_path = os.path.join(GALLERY_DIR, filename)
-    if os.path.exists(img_path):
-        os.remove(img_path)
 
-    delete_artwork(filename)
-    export_csv()
-    rebuild_site()
-    flash("Artwork deleted.")
-    return redirect(url_for("gallery"))
+def editor_tags():
+    config = json.dumps({"csrf": session["csrf"], "saved": read_site_text()}).replace("<", "\\u003c")
+    return (
+        f'<link rel="stylesheet" href="/_admin/assets/editor.css?v={asset_version("editor.css")}">'
+        f"<script>window.KN_ADMIN = {config};</script>"
+        f'<script src="/_admin/assets/editor.js?v={asset_version("editor.js")}"></script>'
+    )
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def site_page(path):
+    full = safe_join(OUTPUT_DIR, path)
+    if full is None:
+        abort(404)
+    if os.path.isdir(full):
+        if path and not path.endswith("/"):
+            return redirect("/" + path + "/")
+        path = os.path.join(path, "index.html")
+        full = os.path.join(full, "index.html")
+    if not os.path.isfile(full):
+        abort(404)
+    if not full.endswith(".html"):
+        return send_from_directory(OUTPUT_DIR, path)
+
+    with open(full, encoding="utf-8") as f:
+        page = f.read()
+    head, marker, tail = page.rpartition("</body>")
+    page = head + editor_tags() + marker + tail if marker else page + editor_tags()
+    return Response(page, mimetype="text/html", headers={"Cache-Control": "no-store"})
+
+
+@app.errorhandler(413)
+def too_large(_):
+    return error("That image is too large. Please use one under 60 MB.", 413)
 
 
 # ---------------------------------------------------------------------------
@@ -276,4 +482,8 @@ def contact_submit():
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(
+        host=os.environ.get("ADMIN_HOST", "0.0.0.0"),
+        port=int(os.environ.get("ADMIN_PORT", "5000")),
+        threaded=True,
+    )

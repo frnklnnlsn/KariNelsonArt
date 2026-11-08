@@ -12,7 +12,7 @@
         {{- partial "forms/contact.html" . -}}
     {{- end -}}
 
-    <p>&copy; {{ now.Year }} Kari Nelson. All rights reserved.</p>
+    <p>&copy; {{ now.Year }} <span data-edit="footer_text" data-edit-type="text" data-edit-label="Footer text">{{ partial "fn/text.html" (dict "k" "footer_text" "d" "Kari Nelson. All rights reserved.") }}</span></p>
 </footer>
 </body>
 </html>

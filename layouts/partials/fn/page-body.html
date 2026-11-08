@@ -1,0 +1,8 @@
+{{- /* Renders a page's body: the editor's saved version if any, else the content file. */ -}}
+{{- $key := printf "page_%s_body" (replace .File.BaseFileName "-" "_") -}}
+{{- $saved := site.Data.site | default dict -}}
+{{- if isset $saved $key -}}
+{{- .RenderString (dict "display" "block") (index $saved $key) -}}
+{{- else -}}
+{{- .Content -}}
+{{- end -}}

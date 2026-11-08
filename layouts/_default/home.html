@@ -1,9 +1,10 @@
 {{ partial "header.html" . }}
 
 <div class="page-content" style="max-width: 800px; margin: 40px auto; padding: 20px;">
-    <h1>{{ .Title }}</h1>
+    {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
+    <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
     {{/* This is where the text from content/_index.md will go */}}
-    {{ .Content }}
+    <div data-edit="page_{{ replace .File.BaseFileName "-" "_" }}_body" data-edit-type="body" data-edit-label="Page text">{{ partial "fn/page-body.html" . }}</div>
 </div>
 
 {{ partial "footer.html" . }}

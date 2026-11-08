@@ -10,3 +10,6 @@ sync.txt
 gallery.db
 imagenames.txt
 .hugo_build.lock
+data/site.json
+.env
+__pycache__/

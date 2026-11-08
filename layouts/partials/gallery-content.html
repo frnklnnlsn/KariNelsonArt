@@ -78,13 +78,13 @@
         <button id="fullscreen-btn" title="View full screen">Full</button>
     </div>
     <div id="image-info">
-      <h3>Image Details</h3>
-      <div class="info-item"><span class="info-label">Title</span><span id="image-title"></span></div>
-      <div class="info-item"><span class="info-label">Date</span><span id="image-date"></span></div>
-      <div class="info-item"><span class="info-label">Description</span><span id="image-description"></span></div>
+      <h3 data-edit="gallery_heading" data-edit-type="text" data-edit-label="Heading">{{ partial "fn/text.html" (dict "k" "gallery_heading" "d" "Image Details") }}</h3>
+      <div class="info-item"><span class="info-label" data-edit="gallery_label_title" data-edit-type="text" data-edit-label="Label">{{ partial "fn/text.html" (dict "k" "gallery_label_title" "d" "Title") }}</span><span id="image-title"></span></div>
+      <div class="info-item"><span class="info-label" data-edit="gallery_label_date" data-edit-type="text" data-edit-label="Label">{{ partial "fn/text.html" (dict "k" "gallery_label_date" "d" "Date") }}</span><span id="image-date"></span></div>
+      <div class="info-item"><span class="info-label" data-edit="gallery_label_description" data-edit-type="text" data-edit-label="Label">{{ partial "fn/text.html" (dict "k" "gallery_label_description" "d" "Description") }}</span><span id="image-description"></span></div>
       <div id="artist-statement-section" style="display:none;">
         <div class="info-item">
-          <span class="info-label">Artist Statement</span>
+          <span class="info-label" data-edit="gallery_label_statement" data-edit-type="text" data-edit-label="Label">{{ partial "fn/text.html" (dict "k" "gallery_label_statement" "d" "Artist Statement") }}</span>
           <span id="image-artist-statement"></span>
         </div>
       </div>
