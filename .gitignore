@@ -13,3 +13,4 @@ imagenames.txt
 data/site.json
 .env
 __pycache__/
+resources/

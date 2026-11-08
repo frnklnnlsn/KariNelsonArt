@@ -20,8 +20,6 @@
             justify-content: space-between;
             align-items: center;
             padding: 15px 30px;
-            background-color: #ffffff;
-            border-bottom: 1px solid #e0e0e0;
         }
         .site-header .site-title {
             font-size: 28px;
@@ -35,15 +33,6 @@
             color: #555;
             font-size: 16px;
         }
-        .site-header .social-nav a {
-            margin-left: 15px;
-            text-decoration: none;
-        }
-        .site-header .social-nav img {
-            width: 24px;
-            height: 24px;
-            vertical-align: middle;
-        }
     </style>
 
     {{/* This is the "socket" for page-specific styles */}}
@@ -56,14 +45,6 @@
             <a href="/" data-edit="nav_about" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_about" "d" "About") }}</a>
             <a href="/gallery/" data-edit="nav_gallery" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_gallery" "d" "Gallery") }}</a>
             <a href="/contact/" data-edit="nav_contact" data-edit-type="text" data-edit-label="Menu link">{{ partial "fn/text.html" (dict "k" "nav_contact" "d" "Contact") }}</a>
-        </nav>
-        <nav class="social-nav">
-                        <a href="{{ partial "fn/text.html" (dict "k" "social_facebook_url" "d" "#") }}" target="_blank" rel="noopener noreferrer" title="Facebook" data-edit="social_facebook_url" data-edit-type="url" data-edit-label="Facebook link">
-                <img src="/social/facebook-icon.svg" alt="Facebook">
-            </a>
-            <a href="{{ partial "fn/text.html" (dict "k" "social_instagram_url" "d" "#") }}" target="_blank" rel="noopener noreferrer" title="Instagram" data-edit="social_instagram_url" data-edit-type="url" data-edit-label="Instagram link">
-                <img src="/social/instagram-icon.svg" alt="Instagram">
-            </a>
         </nav>
     </header>
 <main>

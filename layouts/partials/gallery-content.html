@@ -69,8 +69,7 @@
 
 <div id="gallery-container">
   <div id="gallery-title-container">
-    <button class="dropdown-button" id="category-button"></button>
-    <div class="dropdown-content" id="category-dropdown"></div>
+    <a class="dropdown-button" href="/all-works/" style="display: inline-block; box-sizing: border-box; text-decoration: none;" data-edit="gallery_all_works_button" data-edit-type="text" data-edit-label="Button text">{{ partial "fn/text.html" (dict "k" "gallery_all_works_button" "d" "All Works") }}</a>
   </div>
   <div id="image-display">
     <div id="main-image-wrapper" class="loading">
@@ -128,6 +127,12 @@ const saved = sessionStorage.getItem('lastViewedImageIndex');
 if (saved !== null && !isNaN(saved) && parseInt(saved, 10) < artworks.length) {
     currentIndex = parseInt(saved, 10);
 }
+// Opened from a tile on the All Works page
+const requestedArt = new URLSearchParams(location.search).get('art');
+if (requestedArt) {
+    const requestedIndex = artworks.findIndex(a => a.filename === requestedArt);
+    if (requestedIndex !== -1) currentIndex = requestedIndex;
+}
 
 // -------------------------------------------------------------------------
 // Element refs
@@ -139,8 +144,6 @@ const imageDateEl        = document.getElementById('image-date');
 const imageDescEl        = document.getElementById('image-description');
 const imageStatementEl   = document.getElementById('image-artist-statement');
 const statementSection   = document.getElementById('artist-statement-section');
-const categoryButton     = document.getElementById('category-button');
-const categoryDropdown   = document.getElementById('category-dropdown');
 const thumbnailContainer = document.getElementById('thumbnail-container');
 const thumbnailStrip     = document.getElementById('thumbnail-strip');
 const fullscreenOverlay  = document.getElementById('fullscreen-overlay');
@@ -174,7 +177,6 @@ function updateDisplay() {
     const art = artworks[currentIndex];
     sessionStorage.setItem('lastViewedImageIndex', currentIndex);
 
-    categoryButton.textContent = formatCategory(art.category);
     imageTitleEl.textContent   = art.title        || '—';
     imageDateEl.textContent    = art.date         || '—';
     imageDescEl.textContent    = art.description  || '—';
@@ -224,27 +226,6 @@ function enterFullscreen() {
 function exitFullscreen() {
     fullscreenOverlay.style.display = 'none';
     fullscreenImage.src = '';
-}
-
-// -------------------------------------------------------------------------
-// Category dropdown
-// -------------------------------------------------------------------------
-function populateCategoryDropdown() {
-    const cats = [...new Set(artworks.map(a => a.category))];
-    categoryDropdown.innerHTML = '';
-    cats.forEach(cat => {
-        const link = document.createElement('a');
-        link.href = '#';
-        link.textContent = formatCategory(cat);
-        link.dataset.category = cat;
-        link.addEventListener('click', e => {
-            e.preventDefault();
-            const idx = artworks.findIndex(a => a.category === e.target.dataset.category);
-            if (idx !== -1) { currentIndex = idx; updateDisplay(); }
-            categoryDropdown.classList.remove('show');
-        });
-        categoryDropdown.appendChild(link);
-    });
 }
 
 // -------------------------------------------------------------------------
@@ -313,15 +294,8 @@ function initGallery() {
         document.getElementById('gallery-container').style.display = 'none';
         return;
     }
-    populateCategoryDropdown();
     createThumbnails();
     updateDisplay();
-
-    // Dropdown
-    categoryButton.addEventListener('click', () => categoryDropdown.classList.toggle('show'));
-    window.addEventListener('click', e => {
-        if (!e.target.matches('.dropdown-button')) categoryDropdown.classList.remove('show');
-    });
 
     // Thumbnail scroll
     thumbnailContainer.addEventListener('wheel', handleThumbnailScroll, { passive: false });

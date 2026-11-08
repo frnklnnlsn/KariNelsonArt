@@ -6,6 +6,9 @@
 {{ if eq .File.BaseFileName "gallery" }}
     {{ partial "gallery-content.html" . }}
 
+{{ else if eq .File.BaseFileName "all-works" }}
+    {{ partial "all-works.html" . }}
+
 {{/* Check if this is the Contact page */}}
 {{ else if eq .File.BaseFileName "contact" }}
     {{ partial "contact-form.html" . }}

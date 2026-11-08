@@ -75,7 +75,6 @@
     if (name === "title") document.getElementById("image-title").textContent = value || "—";
     if (name === "date") document.getElementById("image-date").textContent = value || "—";
     if (name === "description") document.getElementById("image-description").textContent = value || "—";
-    if (name === "category") document.getElementById("category-button").textContent = formatCategory(value);
     if (name === "artist_statement") {
       document.getElementById("image-artist-statement").textContent = value;
       document.getElementById("artist-statement-section").style.display = value.trim() ? "block" : "none";
@@ -118,7 +117,28 @@
       make("p", { textContent: "Text, buttons and artwork with an outline can all be edited. You'll see your changes on the page as you make them." }),
       make("p", { textContent: "Visitors won't see anything until you press Publish." }),
     );
+    if (location.pathname === "/all-works/") panel.append(make("hr", { className: "kn-divider" }), ...layoutSettings());
     if (location.pathname === "/contact/") panel.append(make("hr", { className: "kn-divider" }), ...messageSettings());
+  }
+  function layoutSettings() {
+    const grid = document.getElementById("all-works-grid");
+    const slider = (key, label, cssVar, min, max, unit) => {
+      original[key] ??= key in saved ? saved[key] : grid.style.getPropertyValue(cssVar).replace("px", "").trim();
+      const value = key in textChanges ? textChanges[key] : original[key];
+      const output = make("span", { textContent: value + unit });
+      const input = make("input", { type: "range", min, max, step: 1, value, className: "kn-range" });
+      input.addEventListener("input", () => {
+        output.textContent = input.value + unit;
+        grid.style.setProperty(cssVar, input.value + unit);
+        setText(key, input.value);
+      });
+      return make("label", { className: "kn-field" }, make("span", {}, label + ": ", output), input);
+    };
+    return [
+      make("h2", { textContent: "Photo layout" }),
+      slider("all_works_columns", "Photos in each row", "--columns", 1, 8, ""),
+      slider("all_works_gap", "Space between photos", "--gap", 0, 80, "px"),
+    ];
   }
   function messageSettings() {
     const input = make("input", { type: "email", value: recipient, placeholder: "name@example.com" });
@@ -277,7 +297,7 @@
   }
   function buildBar() {
     const here = location.pathname;
-    const pages = [["/", "About"], ["/gallery/", "Gallery"], ["/contact/", "Contact"], ["/thank-you/", "Thank you"]];
+    const pages = [["/", "About"], ["/gallery/", "Gallery"], ["/all-works/", "All Works"], ["/contact/", "Contact"], ["/thank-you/", "Thank you"]];
     const nav = make("nav", { className: "kn-pages" }, ...pages.map(([href, textContent]) => {
       const link = make("a", { href, textContent });
       if (href === here) link.setAttribute("aria-current", "page");

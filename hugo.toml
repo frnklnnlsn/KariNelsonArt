@@ -4,3 +4,11 @@ title = 'My New Hugo Site'
 [security]
   [security.funcs]
     getenv = ["CONTEXT"]
+
+# Lets Hugo make small preview images for the All Works page.
+[[module.mounts]]
+  source = "assets"
+  target = "assets"
+[[module.mounts]]
+  source = "static/gallery"
+  target = "assets/art-files"

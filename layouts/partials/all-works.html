@@ -1,0 +1,41 @@
+{{ $columns := partial "fn/text.html" (dict "k" "all_works_columns" "d" "4") }}
+{{ $gap := partial "fn/text.html" (dict "k" "all_works_gap" "d" "12") }}
+<style>
+    .all-works { max-width: 1400px; margin: 0 auto; padding: 32px 20px 56px; }
+    .all-works h1 { margin: 0 0 28px; text-align: center; }
+    .all-works-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: var(--gap); }
+    .all-works-grid a { display: block; aspect-ratio: 1; overflow: hidden; background: #efefef; }
+    .all-works-grid img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease, opacity .25s ease; }
+    .all-works-grid a:hover img, .all-works-grid a:focus-visible img { transform: scale(1.03); opacity: .92; }
+    @media (max-width: 640px) { .all-works-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (prefers-reduced-motion: reduce) { .all-works-grid img { transition: none; } }
+</style>
+
+{{- $artworks := slice -}}
+{{- with resources.Get "gallery.csv" -}}
+  {{- range after 1 (.Content | transform.Unmarshal (dict "delimiter" ",")) -}}
+    {{- $artworks = $artworks | append (dict "filename" (index . 0) "title" (index . 1) "category" (index . 4)) -}}
+  {{- end -}}
+{{- end -}}
+
+<div class="all-works">
+    {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
+    <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
+    <div class="all-works-grid" id="all-works-grid" style="--columns: {{ $columns | safeCSS }}; --gap: {{ $gap | safeCSS }}px;">
+        {{- range sort $artworks "category" -}}
+        {{- $full := printf "/gallery/%s" .filename -}}
+        {{- $src := $full -}}
+        {{- with resources.Get (printf "art-files/%s" .filename) -}}
+            {{- $rotate := "" -}}
+            {{- if eq .MediaType.SubType "jpeg" -}}
+                {{- with .Exif -}}
+                    {{- $o := .Tags.Orientation -}}
+                    {{- if eq $o 3 -}}{{- $rotate = " r180" -}}{{- else if eq $o 6 -}}{{- $rotate = " r270" -}}{{- else if eq $o 8 -}}{{- $rotate = " r90" -}}{{- end -}}
+                {{- end -}}
+            {{- end -}}
+            {{- $src = (.Fill (printf "700x700 Center q75 jpg%s" $rotate)).RelPermalink -}}
+        {{- end -}}
+        <a href="/gallery/?art={{ .filename }}" title="{{ .title }}"><img src="{{ $src }}" alt="{{ .title }}" loading="lazy" decoding="async"></a>
+        {{- end -}}
+    </div>
+</div>

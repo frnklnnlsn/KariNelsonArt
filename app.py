@@ -178,7 +178,8 @@ def rebuild_site():
     try:
         subprocess.run(
             [HUGO_BIN, "-s", BASE_DIR, "-d", OUTPUT_DIR, "--cleanDestinationDir"],
-            check=True, capture_output=True, text=True, timeout=180,
+            check=True, capture_output=True, text=True, timeout=900,
+            env={**os.environ, "HUGO_NUMWORKERMULTIPLIER": "1"},
         )
         return True
     except (subprocess.SubprocessError, OSError) as e:
@@ -255,6 +256,7 @@ def send_contact_email(sender_name, sender_email, phone, message_body):
 ARTWORK_FIELDS = ("title", "date", "description", "category", "artist_statement")
 TEXT_KEY = re.compile(r"^[a-z0-9_]{1,80}$")
 SAFE_URL = re.compile(r"^(https?://|mailto:|/|#)", re.I)
+NUMBER_LIMITS = {"all_works_columns": (1, 8), "all_works_gap": (0, 80)}
 EMAIL_ADDRESS = re.compile(r"^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$")
 
 
@@ -344,6 +346,10 @@ def api_publish():
     for key, value in text.items():
         if not TEXT_KEY.match(key) or not isinstance(value, str) or len(value) > 20000:
             return error("One of the text changes wasn't valid.")
+        if key in NUMBER_LIMITS:
+            low, high = NUMBER_LIMITS[key]
+            if not value.isdigit() or not low <= int(value) <= high:
+                return error("That spacing or row number is out of range.")
         if key.endswith("_url") and value.strip() and not SAFE_URL.match(value.strip()):
             return error("Links need to start with https:// (for example https://facebook.com/yourpage).")
 

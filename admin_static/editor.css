@@ -37,6 +37,7 @@ body.kn-hints [data-edit], body.kn-hints .kn-art { outline-color: rgba(31,111,23
 .kn-field input, .kn-field textarea { width: 100%; padding: 9px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; color: var(--kn-ink); background: #fff; }
 .kn-field textarea { min-height: 120px; resize: vertical; line-height: 1.4; }
 .kn-field input:focus, .kn-field textarea:focus { outline: 2px solid var(--kn-accent); outline-offset: 0; border-color: transparent; }
+.kn-field input.kn-range { padding: 0; border: 0; accent-color: var(--kn-accent); }
 .kn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .kn-divider { margin: 18px 0 14px; border: 0; border-top: 1px solid var(--kn-line); }
 .kn-toast { position: fixed; z-index: 2100; left: 50%; bottom: 22px; transform: translateX(-50%); max-width: min(480px, 90vw); padding: 11px 16px; border-radius: 6px;
