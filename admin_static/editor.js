@@ -75,6 +75,7 @@
     if (name === "title") document.getElementById("image-title").textContent = value || "—";
     if (name === "date") document.getElementById("image-date").textContent = value || "—";
     if (name === "description") document.getElementById("image-description").textContent = value || "—";
+    if (name === "category") populateCategoryList();
     if (name === "artist_statement") {
       document.getElementById("image-artist-statement").textContent = value;
       document.getElementById("artist-statement-section").style.display = value.trim() ? "block" : "none";

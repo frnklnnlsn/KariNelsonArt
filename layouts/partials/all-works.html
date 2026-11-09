@@ -1,8 +1,10 @@
 {{ $columns := partial "fn/text.html" (dict "k" "all_works_columns" "d" "4") }}
 {{ $gap := partial "fn/text.html" (dict "k" "all_works_gap" "d" "12") }}
 <style>
-    .all-works { max-width: 1400px; margin: 0 auto; padding: 32px 20px 56px; }
+    .all-works { max-width: 1400px; margin: 0 auto; padding: 32px 30px 56px; }
     .all-works h1 { margin: 0 0 28px; text-align: center; }
+    .all-works-section + .all-works-section { margin-top: 64px; }
+    .all-works-section h2 { margin: 0 0 18px; font-size: 24px; font-weight: 500; }
     .all-works-grid { display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: var(--gap); }
     .all-works-grid a { display: block; aspect-ratio: 1; overflow: hidden; background: #efefef; }
     .all-works-grid img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .25s ease, opacity .25s ease; }
@@ -21,21 +23,35 @@
 <div class="all-works">
     {{ $titleKey := printf "page_%s_title" (replace .File.BaseFileName "-" "_") }}
     <h1 data-edit="{{ $titleKey }}" data-edit-type="text" data-edit-label="Page title">{{ partial "fn/text.html" (dict "k" $titleKey "d" .Title) }}</h1>
-    <div class="all-works-grid" id="all-works-grid" style="--columns: {{ $columns | safeCSS }}; --gap: {{ $gap | safeCSS }}px;">
-        {{- range sort $artworks "category" -}}
+    <div id="all-works-grid" style="--columns: {{ $columns | safeCSS }}; --gap: {{ $gap | safeCSS }}px;">
+        {{- $groups := dict -}}
+        {{- range $artworks -}}
+            {{- $key := replace (lower (trim .category " ")) "-" " " -}}
+            {{- if not $key -}}{{- $key = "other" -}}{{- end -}}
+            {{- $groups = merge $groups (dict $key ((index $groups $key | default slice) | append .)) -}}
+        {{- end -}}
+        {{- range $key, $items := $groups -}}
+        <section class="all-works-section">
+            <h2>{{ humanize $key }}</h2>
+            <div class="all-works-grid">
+            {{- range $items -}}
         {{- $full := printf "/gallery/%s" .filename -}}
         {{- $src := $full -}}
         {{- with resources.Get (printf "art-files/%s" .filename) -}}
-            {{- $rotate := "" -}}
-            {{- if eq .MediaType.SubType "jpeg" -}}
-                {{- with .Exif -}}
-                    {{- $o := .Tags.Orientation -}}
-                    {{- if eq $o 3 -}}{{- $rotate = " r180" -}}{{- else if eq $o 6 -}}{{- $rotate = " r270" -}}{{- else if eq $o 8 -}}{{- $rotate = " r90" -}}{{- end -}}
-                {{- end -}}
-            {{- end -}}
-            {{- $src = (.Fill (printf "700x700 Center q75 jpg%s" $rotate)).RelPermalink -}}
+        {{- $rotate := "" -}}
+        {{- if eq .MediaType.SubType "jpeg" -}}
+        {{- with .Exif -}}
+        {{- $o := .Tags.Orientation -}}
+        {{- if eq $o 3 -}}{{- $rotate = " r180" -}}{{- else if eq $o 6 -}}{{- $rotate = " r270" -}}{{- else if eq $o 8 -}}{{- $rotate = " r90" -}}{{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- $src = (.Fill (printf "700x700 Center q75 jpg%s" $rotate)).RelPermalink -}}
         {{- end -}}
         <a href="/gallery/?art={{ .filename }}" title="{{ .title }}"><img src="{{ $src }}" alt="{{ .title }}" loading="lazy" decoding="async"></a>
+        
+            {{- end -}}
+            </div>
+        </section>
         {{- end -}}
     </div>
 </div>
